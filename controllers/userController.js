@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const User = require("../models/userModel");
 const bycrpt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
 //@desc Register the user
 //@route POST /api/users/register
@@ -27,7 +28,6 @@ const registerUser = asyncHandler(async(req, res) => {
         email,
         password: hashedPassword
     })
-    console.log(`User created with name ${user}`);
 
     //if user is created successfully then we will not send the password because it contains hashed password
     if(user){
@@ -38,14 +38,38 @@ const registerUser = asyncHandler(async(req, res) => {
     }else{
         throw new Error("User data is not valid");
     }
-    res.status(200).json({ message : "Register the user" });
+
 });
 
 //@desc login user
 //@route POST /api/users/login
-//@access Public
+//@access Private
 const loginUser = asyncHandler(async(req, res) => {
-    res.status(200).json({ message : "Login the user" });
+   const { email,password} = req.body;
+   if(!email || !password){
+    res.status(400);
+    throw new Error("Please fill all the feilds");
+   }
+   //Check if user exits in the database
+   const user = await User.findOne({ email});
+   //Compare the password with the hashed password
+   if(user && (await bycrpt.compare(password,user.password))){
+    const accessToken =jwt.sign({
+        user:{
+            username: user.username,
+            email: user.email,
+            id: user.id
+        },
+    },process.env.ACCESS_TOKEN_SECRET, 
+{
+        expiresIn: "1m"
+});
+    //if user is found then we will send the access token
+    res.status(200).json({accessToken})
+   }else{
+    res.status(401);
+    throw new Error("Invalid credentials");
+   }
 });
 
 //@desc Current User
